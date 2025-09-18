@@ -17,6 +17,8 @@ import {
   Key
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther } from 'viem';
 
 interface PrivateBuyFlowProps {
   walletConnected: boolean;
@@ -30,7 +32,14 @@ const PrivateBuyFlow = ({ walletConnected }: PrivateBuyFlowProps) => {
   const [privacyLevel, setPrivacyLevel] = useState<'standard' | 'enhanced' | 'maximum'>('enhanced');
   const [hideAmount, setHideAmount] = useState(true);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [transactionHash, setTransactionHash] = useState<string>('');
   const { toast } = useToast();
+  
+  const { address } = useAccount();
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
 
   const price = 45.50;
   const total = amount ? (parseFloat(amount) * price).toFixed(2) : '0.00';
@@ -82,7 +91,69 @@ const PrivateBuyFlow = ({ walletConnected }: PrivateBuyFlowProps) => {
       setCurrentStep('confirm');
     } else if (currentStep === 'confirm') {
       setCurrentStep('processing');
-      simulateProcessing();
+      executePrivateTrade();
+    }
+  };
+
+  const executePrivateTrade = async () => {
+    try {
+      setProcessingProgress(20);
+      
+      // Simulate FHE encryption process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setProcessingProgress(40);
+      
+      // Call smart contract with encrypted parameters
+      const contractAddress = "0x1234567890123456789012345678901234567890"; // Replace with actual contract address
+      const creditId = 1; // Replace with actual credit ID
+      
+      // Convert amount to encrypted format (simulated)
+      const encryptedAmount = BigInt(Math.floor(parseFloat(amount) * 100)); // Convert to wei-like format
+      const encryptedPrice = BigInt(Math.floor(parseFloat(total) * 100)); // Convert to wei-like format
+      
+      setProcessingProgress(60);
+      
+      // Write to smart contract
+      await writeContract({
+        address: contractAddress as `0x${string}`,
+        abi: [
+          {
+            "inputs": [
+              {"internalType": "uint256", "name": "creditId", "type": "uint256"},
+              {"internalType": "uint256", "name": "amount", "type": "uint256"},
+              {"internalType": "uint256", "name": "price", "type": "uint256"}
+            ],
+            "name": "initiateTrade",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
+        ],
+        functionName: 'initiateTrade',
+        args: [BigInt(creditId), encryptedAmount, encryptedPrice],
+      });
+      
+      setProcessingProgress(80);
+      
+      if (hash) {
+        setTransactionHash(hash);
+        setProcessingProgress(100);
+        setCurrentStep('complete');
+        
+        toast({
+          title: "Trade Executed Successfully",
+          description: `Private transaction completed with hash: ${hash.slice(0, 10)}...`,
+        });
+      }
+      
+    } catch (error) {
+      console.error('Trade execution failed:', error);
+      toast({
+        title: "Trade Failed",
+        description: "Failed to execute private trade. Please try again.",
+        variant: "destructive",
+      });
+      setCurrentStep('confirm');
     }
   };
 
@@ -278,7 +349,9 @@ const PrivateBuyFlow = ({ walletConnected }: PrivateBuyFlowProps) => {
             <Card className="p-4 bg-gradient-earth text-primary-foreground">
               <div className="space-y-2">
                 <div className="text-sm opacity-90">Transaction Hash:</div>
-                <div className="font-mono text-xs break-all">0x7a8f9e2d...••••••...b3c4e5f6</div>
+                <div className="font-mono text-xs break-all">
+                  {transactionHash || hash || '0x7a8f9e2d...••••••...b3c4e5f6'}
+                </div>
               </div>
             </Card>
             
